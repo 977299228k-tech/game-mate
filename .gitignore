@@ -1,0 +1,42 @@
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Frontend (game-mate) =====
+game-mate/node_modules/
+game-mate/dist/
+game-mate/.env
+game-mate/.env.local
+game-mate/.env.*.local
+
+# ===== Backend (game-mate-server) =====
+game-mate-server/target/
+game-mate-server/.mvn/wrapper/maven-wrapper.jar
+game-mate-server/uploads/
+game-mate-server/logs/
+
+# ===== Sensitive =====
+*.env
+.env
+application-local.yml
+application-local.properties
+
+# ===== Build =====
+*.jar
+*.war
+*.class
+
+# ===== Logs =====
+*.log
+logs/
