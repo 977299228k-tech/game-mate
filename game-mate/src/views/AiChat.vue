@@ -284,8 +284,49 @@
     </div>
 
     <!-- 捕获设置弹窗 -->
-    <el-dialog v-model="showSettings" title="AI设置" width="480px" :show-close="true">
+    <el-dialog v-model="showSettings" title="AI设置" width="560px" :show-close="true">
       <div class="settings-form">
+        <div class="form-item">
+          <label>模型调用方式</label>
+          <el-radio-group v-model="clientAiConfig.mode" @change="saveClientAiConfigMetadata">
+            <el-radio-button label="server">平台默认模型</el-radio-button>
+            <el-radio-button label="custom">使用自己的 API</el-radio-button>
+          </el-radio-group>
+          <span class="form-hint" v-if="clientAiConfig.mode === 'server'">使用后台管理员配置的模型和额度</span>
+          <span class="form-hint" v-else>支持使用 Bearer API Key 的 OpenAI 兼容 chat/completions 接口</span>
+        </div>
+        <template v-if="clientAiConfig.mode === 'custom'">
+          <div class="custom-api-panel">
+            <div class="form-item">
+              <label>API 地址</label>
+              <el-input
+                v-model="clientAiConfig.apiUrl"
+                placeholder="https://你的服务地址/v1/chat/completions"
+                @change="saveClientAiConfigMetadata"
+              />
+            </div>
+            <div class="form-item">
+              <label>模型名称</label>
+              <el-input
+                v-model="clientAiConfig.model"
+                placeholder="填写供应商提供的模型 ID"
+                @change="saveClientAiConfigMetadata"
+              />
+            </div>
+            <div class="form-item">
+              <label>API Key</label>
+              <el-input
+                v-model="clientAiConfig.apiKey"
+                type="password"
+                show-password
+                autocomplete="new-password"
+                placeholder="sk-..."
+              />
+              <span class="form-hint security-hint">🔒 API Key 仅保存在当前页面内存，刷新页面后需要重新填写</span>
+            </div>
+          </div>
+        </template>
+        <div class="form-item-divider"></div>
         <div class="form-item">
           <label>AI性格/人格</label>
           <el-select v-model="settings.personality" @change="handlePersonalityChange">
@@ -342,7 +383,7 @@
       </div>
       <template #footer>
         <el-button @click="testSpeakVoice">🔊 测试语音</el-button>
-        <el-button type="primary" @click="showSettings = false">完成</el-button>
+        <el-button type="primary" @click="handleSettingsDone">完成</el-button>
       </template>
     </el-dialog>
 
@@ -516,6 +557,16 @@ let voiceMonitorFrame = null
 let recognitionPausedForSpeech = false
 let vadLoudFrames = 0
 let vadNoiseFloor = 0.012
+
+const CLIENT_AI_CONFIG_KEY = 'game-mate-client-ai-config-v1'
+const savedClientAiConfig = loadClientAiConfigMetadata()
+const clientAiConfig = reactive({
+  mode: savedClientAiConfig.mode || 'server',
+  apiUrl: savedClientAiConfig.apiUrl || '',
+  model: savedClientAiConfig.model || '',
+  // 密钥只放内存，不进入localStorage/sessionStorage和后端数据库。
+  apiKey: ''
+})
 
 const highlightForm = reactive({
   title: '',
@@ -822,7 +873,8 @@ async function doAnalyze(description) {
       gameId: selectedGame.value.id,
       imageBase64: currentScreenshot.value,
       content: description,
-      personality: settings.personality
+      personality: settings.personality,
+      clientAiConfig: buildClientAiConfig()
     })
     
     if (res.code === 200 && res.data) {
@@ -1176,7 +1228,8 @@ async function sendStreamingVoiceMessage(text) {
     const completeContent = await streamMessageWithPersonality({
       gameId: selectedGame.value.id,
       content: text,
-      personality: settings.personality
+      personality: settings.personality,
+      clientAiConfig: buildClientAiConfig()
     }, {
       signal: controller.signal,
       onDelta: (chunk) => {
@@ -1274,7 +1327,8 @@ async function sendMessage(text, options = {}) {
         gameId: selectedGame.value.id,
         imageBase64: currentScreenshot.value,
         content: currentText,
-        personality: settings.personality
+        personality: settings.personality,
+        clientAiConfig: buildClientAiConfig()
       })
       
       if (res.code === 200 && res.data) {
@@ -1296,7 +1350,8 @@ async function sendMessage(text, options = {}) {
       const res = await sendMessageWithPersonality({
         gameId: selectedGame.value.id,
         content: currentText,
-        personality: settings.personality
+        personality: settings.personality,
+        clientAiConfig: buildClientAiConfig()
       })
       
       if (res.code === 200 && res.data) {
@@ -1633,6 +1688,60 @@ function handlePersonalityChange() {
 
 function handleVoiceChange() {
   ElMessage.success('语音音色已更新')
+}
+
+function loadClientAiConfigMetadata() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CLIENT_AI_CONFIG_KEY) || '{}')
+    return {
+      mode: saved.mode === 'custom' ? 'custom' : 'server',
+      apiUrl: typeof saved.apiUrl === 'string' ? saved.apiUrl : '',
+      model: typeof saved.model === 'string' ? saved.model : ''
+    }
+  } catch {
+    return { mode: 'server', apiUrl: '', model: '' }
+  }
+}
+
+function saveClientAiConfigMetadata() {
+  try {
+    sessionStorage.setItem(CLIENT_AI_CONFIG_KEY, JSON.stringify({
+      mode: clientAiConfig.mode,
+      apiUrl: clientAiConfig.apiUrl.trim(),
+      model: clientAiConfig.model.trim()
+    }))
+  } catch {
+    // 隐私模式禁用会话存储时仍可在当前页面使用。
+  }
+}
+
+function buildClientAiConfig() {
+  if (clientAiConfig.mode !== 'custom') return null
+  const apiUrl = clientAiConfig.apiUrl.trim()
+  const apiKey = clientAiConfig.apiKey.trim()
+  const model = clientAiConfig.model.trim()
+  if (!apiUrl || !model || !apiKey) {
+    throw new Error('请在AI设置中完整填写API地址、模型名称和API Key')
+  }
+  if (!apiUrl.toLowerCase().startsWith('https://')) {
+    throw new Error('客户API地址必须使用HTTPS')
+  }
+  return { apiUrl, apiKey, model }
+}
+
+function handleSettingsDone() {
+  try {
+    buildClientAiConfig()
+    saveClientAiConfigMetadata()
+    showSettings.value = false
+    ElMessage.success(clientAiConfig.mode === 'custom' ? `已切换到客户模型：${clientAiConfig.model.trim()}` : '已切换到平台默认模型')
+  } catch (error) {
+    ElMessage.warning(error.message)
+  }
+}
+
+function saveSettings() {
+  aiChatStore.updateSettings({ ...settings.value })
 }
 
 function triggerUpload() {
@@ -2737,6 +2846,20 @@ watch(() => settings.speechPitch, () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.custom-api-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.security-hint {
+  color: #10b981;
 }
 
 .form-item-divider {

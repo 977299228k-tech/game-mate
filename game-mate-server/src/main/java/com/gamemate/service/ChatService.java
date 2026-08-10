@@ -1,6 +1,7 @@
 package com.gamemate.service;
 
 import com.gamemate.dto.ChatMessageDTO;
+import com.gamemate.dto.ClientAiConfigDTO;
 import com.gamemate.vo.ChatMessageVO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,8 +22,17 @@ public interface ChatService {
 
     ChatMessageVO analyzeScreenWithPersonality(Long userId, ChatMessageDTO dto, String imageBase64, String personality);
 
+    ChatMessageVO analyzeScreenWithPersonality(Long userId, ChatMessageDTO dto, String imageBase64,
+                                               String personality, ClientAiConfigDTO clientConfig);
+
     ChatMessageVO sendMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality);
+
+    ChatMessageVO sendMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
+                                             ClientAiConfigDTO clientConfig);
 
     ChatMessageVO streamMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
                                                Consumer<String> onDelta);
+
+    ChatMessageVO streamMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
+                                               ClientAiConfigDTO clientConfig, Consumer<String> onDelta);
 }

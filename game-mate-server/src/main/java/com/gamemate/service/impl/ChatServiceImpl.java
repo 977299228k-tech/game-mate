@@ -2,6 +2,7 @@ package com.gamemate.service.impl;
 
 import com.gamemate.config.AiConfig;
 import com.gamemate.dto.ChatMessageDTO;
+import com.gamemate.dto.ClientAiConfigDTO;
 import com.gamemate.entity.ChatMessage;
 import com.gamemate.mapper.ChatMessageMapper;
 import com.gamemate.service.AiService;
@@ -130,6 +131,12 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatMessageVO analyzeScreenWithPersonality(Long userId, ChatMessageDTO dto, String imageBase64, String personality) {
+        return analyzeScreenWithPersonality(userId, dto, imageBase64, personality, null);
+    }
+
+    @Override
+    public ChatMessageVO analyzeScreenWithPersonality(Long userId, ChatMessageDTO dto, String imageBase64,
+                                                      String personality, ClientAiConfigDTO clientConfig) {
         if (userId == null) {
             userId = 1L;
         }
@@ -142,13 +149,15 @@ public class ChatServiceImpl implements ChatService {
         chatMessageMapper.insert(userMessage);
 
         String aiResponse;
-        if (aiConfig.getEnabled()) {
+        if (aiConfig.getEnabled() || clientConfig != null) {
             if (imageBase64 != null && !imageBase64.isEmpty()) {
-                aiResponse = aiService.analyzeScreenWithPersonality(userId, dto.getGameId(), imageBase64, queryText, personality);
+                aiResponse = aiService.analyzeScreenWithPersonality(
+                        userId, dto.getGameId(), imageBase64, queryText, personality, clientConfig);
             } else {
                 log.info("无图片，使用纯文本游戏知识回答模式");
                 aiResponse = aiService.chatWithPersonality(userId, dto.getGameId(),
-                        "[游戏知识问答] 请基于游戏知识回答以下问题：\n" + queryText, null, personality);
+                        "[游戏知识问答] 请基于游戏知识回答以下问题：\n" + queryText,
+                        null, personality, clientConfig);
             }
         } else {
             aiResponse = "AI功能暂未开启。";
@@ -166,6 +175,12 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatMessageVO sendMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality) {
+        return sendMessageWithPersonality(userId, dto, personality, null);
+    }
+
+    @Override
+    public ChatMessageVO sendMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
+                                                    ClientAiConfigDTO clientConfig) {
         if (userId == null) {
             userId = 1L;
         }
@@ -177,9 +192,10 @@ public class ChatServiceImpl implements ChatService {
         chatMessageMapper.insert(userMessage);
 
         String aiResponse;
-        if (aiConfig.getEnabled()) {
+        if (aiConfig.getEnabled() || clientConfig != null) {
             List<Map<String, String>> history = getRecentHistory(userId, dto.getGameId(), 10);
-            aiResponse = aiService.chatWithPersonality(userId, dto.getGameId(), dto.getContent(), history, personality);
+            aiResponse = aiService.chatWithPersonality(
+                    userId, dto.getGameId(), dto.getContent(), history, personality, clientConfig);
         } else {
             aiResponse = generateFallbackResponse(dto.getContent());
         }
@@ -197,6 +213,12 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public ChatMessageVO streamMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
                                                       Consumer<String> onDelta) {
+        return streamMessageWithPersonality(userId, dto, personality, null, onDelta);
+    }
+
+    @Override
+    public ChatMessageVO streamMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
+                                                      ClientAiConfigDTO clientConfig, Consumer<String> onDelta) {
         Long effectiveUserId = userId != null ? userId : 1L;
         List<Map<String, String>> history = getRecentHistory(effectiveUserId, dto.getGameId(), 10);
 
@@ -208,9 +230,9 @@ public class ChatServiceImpl implements ChatService {
         chatMessageMapper.insert(userMessage);
 
         String aiResponse;
-        if (aiConfig.getEnabled()) {
+        if (aiConfig.getEnabled() || clientConfig != null) {
             aiResponse = aiService.streamChatWithPersonality(
-                    effectiveUserId, dto.getGameId(), dto.getContent(), history, personality, onDelta);
+                    effectiveUserId, dto.getGameId(), dto.getContent(), history, personality, clientConfig, onDelta);
         } else {
             aiResponse = generateFallbackResponse(dto.getContent());
             onDelta.accept(aiResponse);

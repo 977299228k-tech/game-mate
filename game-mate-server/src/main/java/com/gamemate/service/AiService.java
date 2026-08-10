@@ -1,5 +1,6 @@
 package com.gamemate.service;
 
+import com.gamemate.dto.ClientAiConfigDTO;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -10,13 +11,23 @@ public interface AiService {
 
     String chatWithPersonality(Long userId, Long gameId, String userMessage, List<Map<String, String>> history, String personality);
 
+    String chatWithPersonality(Long userId, Long gameId, String userMessage, List<Map<String, String>> history,
+                               String personality, ClientAiConfigDTO clientConfig);
+
     String streamChatWithPersonality(Long userId, Long gameId, String userMessage,
                                      List<Map<String, String>> history, String personality,
                                      Consumer<String> onDelta);
+
+    String streamChatWithPersonality(Long userId, Long gameId, String userMessage,
+                                     List<Map<String, String>> history, String personality,
+                                     ClientAiConfigDTO clientConfig, Consumer<String> onDelta);
 
     String analyzeScreen(Long userId, Long gameId, String imageBase64);
 
     String analyzeScreenWithQuery(Long userId, Long gameId, String imageBase64, String query);
 
     String analyzeScreenWithPersonality(Long userId, Long gameId, String imageBase64, String query, String personality);
+
+    String analyzeScreenWithPersonality(Long userId, Long gameId, String imageBase64, String query,
+                                        String personality, ClientAiConfigDTO clientConfig);
 }

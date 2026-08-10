@@ -37,9 +37,9 @@ class ChatControllerStreamTests {
 
     @Test
     void streamsDeltaAndDoneEvents() throws Exception {
-        when(chatService.streamMessageWithPersonality(any(), any(), any(), any()))
+        when(chatService.streamMessageWithPersonality(any(), any(), any(), any(), any()))
                 .thenAnswer(invocation -> {
-                    Consumer<String> onDelta = invocation.getArgument(3);
+                    Consumer<String> onDelta = invocation.getArgument(4);
                     onDelta.accept("第一段。");
                     onDelta.accept("第二段。");
 
@@ -52,7 +52,8 @@ class ChatControllerStreamTests {
         MvcResult asyncResult = mockMvc.perform(post("/api/chat/messages-with-personality/stream")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"gameId":1,"content":"测试连续语音","personality":"friendly"}
+                                {"gameId":1,"content":"测试连续语音","personality":"friendly",
+                                 "clientAiConfig":{"apiUrl":"https://example.com/v1/chat/completions","apiKey":"test-key","model":"test-model"}}
                                 """))
                 .andExpect(request().asyncStarted())
                 .andReturn();

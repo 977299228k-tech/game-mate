@@ -2,6 +2,7 @@ package com.gamemate.controller;
 
 import com.gamemate.common.Result;
 import com.gamemate.dto.ChatMessageDTO;
+import com.gamemate.dto.ClientAiConfigDTO;
 import com.gamemate.service.ChatService;
 import com.gamemate.vo.ChatMessageVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,7 +57,8 @@ public class ChatController {
         
         String personality = (String) payload.get("personality");
         
-        return Result.success(chatService.sendMessageWithPersonality(userId, dto, personality));
+        return Result.success(chatService.sendMessageWithPersonality(
+                userId, dto, personality, extractClientAiConfig(payload)));
     }
 
     @PostMapping(value = "/messages-with-personality/stream", produces = "text/event-stream")
@@ -72,12 +74,13 @@ public class ChatController {
         dto.setRole((String) payload.getOrDefault("role", "user"));
         dto.setContent((String) payload.get("content"));
         String personality = (String) payload.get("personality");
+        ClientAiConfigDTO clientConfig = extractClientAiConfig(payload);
 
         SseEmitter emitter = new SseEmitter(130_000L);
         CompletableFuture.runAsync(() -> {
             try {
                 ChatMessageVO result = chatService.streamMessageWithPersonality(
-                        userId, dto, personality, chunk -> sendDelta(emitter, chunk));
+                        userId, dto, personality, clientConfig, chunk -> sendDelta(emitter, chunk));
                 emitter.send(SseEmitter.event()
                         .name("done")
                         .data(Map.of("id", result.getId(), "content", result.getContent())));
@@ -157,6 +160,23 @@ public class ChatController {
         dto.setRole("user");
         dto.setContent(content != null ? content : "请分析这张游戏画面");
         
-        return Result.success(chatService.analyzeScreenWithPersonality(userId, dto, imageBase64, personality));
+        return Result.success(chatService.analyzeScreenWithPersonality(
+                userId, dto, imageBase64, personality, extractClientAiConfig(data)));
+    }
+
+    private ClientAiConfigDTO extractClientAiConfig(Map<String, Object> payload) {
+        Object rawConfig = payload.get("clientAiConfig");
+        if (!(rawConfig instanceof Map<?, ?> configMap)) {
+            return null;
+        }
+        ClientAiConfigDTO config = new ClientAiConfigDTO();
+        config.setApiUrl(stringValue(configMap.get("apiUrl")));
+        config.setApiKey(stringValue(configMap.get("apiKey")));
+        config.setModel(stringValue(configMap.get("model")));
+        return config;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString();
     }
 }

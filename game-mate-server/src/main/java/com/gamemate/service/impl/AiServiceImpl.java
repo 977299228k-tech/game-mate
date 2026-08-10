@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamemate.config.AiConfig;
 import com.gamemate.config.FileUploadConfig;
+import com.gamemate.dto.ClientAiConfigDTO;
 import com.gamemate.entity.Game;
 import com.gamemate.entity.User;
 import com.gamemate.mapper.GameMapper;
@@ -80,7 +81,14 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String chatWithPersonality(Long userId, Long gameId, String userMessage, List<Map<String, String>> history, String personality) {
-        if (!aiConfig.getEnabled()) {
+        return chatWithPersonality(userId, gameId, userMessage, history, personality, null);
+    }
+
+    @Override
+    public String chatWithPersonality(Long userId, Long gameId, String userMessage,
+                                      List<Map<String, String>> history, String personality,
+                                      ClientAiConfigDTO clientConfig) {
+        if (!aiConfig.getEnabled() && clientConfig == null) {
             log.warn("AI功能未开启");
             return "⚠️ AI功能当前未开启。请在 application.yml 中设置 game-mate.ai.enabled=true";
         }
@@ -107,7 +115,7 @@ public class AiServiceImpl implements AiService {
             messages.add(userMsg);
 
             log.info("调用AI API，消息数: {}", messages.size());
-            String result = callAiApi(messages);
+            String result = callAiApi(messages, clientConfig);
             log.info("AI调用成功，回答长度: {}", result.length());
             return result;
         } catch (Exception e) {
@@ -120,7 +128,14 @@ public class AiServiceImpl implements AiService {
     public String streamChatWithPersonality(Long userId, Long gameId, String userMessage,
                                             List<Map<String, String>> history, String personality,
                                             Consumer<String> onDelta) {
-        if (!aiConfig.getEnabled()) {
+        return streamChatWithPersonality(userId, gameId, userMessage, history, personality, null, onDelta);
+    }
+
+    @Override
+    public String streamChatWithPersonality(Long userId, Long gameId, String userMessage,
+                                            List<Map<String, String>> history, String personality,
+                                            ClientAiConfigDTO clientConfig, Consumer<String> onDelta) {
+        if (!aiConfig.getEnabled() && clientConfig == null) {
             String fallback = "⚠️ AI功能当前未开启。请在 application.yml 中设置 game-mate.ai.enabled=true";
             onDelta.accept(fallback);
             return fallback;
@@ -143,7 +158,7 @@ public class AiServiceImpl implements AiService {
         userMsg.put("content", userMessage);
         messages.add(userMsg);
 
-        return callAiApiStream(messages, onDelta);
+        return callAiApiStream(messages, clientConfig, onDelta);
     }
 
     @Override
@@ -153,7 +168,13 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String analyzeScreenWithPersonality(Long userId, Long gameId, String imageBase64, String query, String personality) {
-        if (!aiConfig.getEnabled()) {
+        return analyzeScreenWithPersonality(userId, gameId, imageBase64, query, personality, null);
+    }
+
+    @Override
+    public String analyzeScreenWithPersonality(Long userId, Long gameId, String imageBase64, String query,
+                                               String personality, ClientAiConfigDTO clientConfig) {
+        if (!aiConfig.getEnabled() && clientConfig == null) {
             return "画面分析功能暂未开启。当前检测到您上传了游戏画面，建议关注当前局势，合理利用技能和资源。";
         }
 
@@ -186,7 +207,7 @@ public class AiServiceImpl implements AiService {
                     }
                 } catch (Exception imgError) {
                     log.warn("图片处理失败: {}，使用纯文本模式", imgError.getMessage());
-                    return analyzeWithTextOnly(userId, gameId, effectiveQuery, personality);
+                    return analyzeWithTextOnly(userId, gameId, effectiveQuery, personality, clientConfig);
                 }
 
                 List<Map<String, Object>> userContent = new ArrayList<>();
@@ -217,7 +238,7 @@ public class AiServiceImpl implements AiService {
 
                 try {
                     long startTime = System.currentTimeMillis();
-                    String result = callVisionAiApi(messages);
+                    String result = callVisionAiApi(messages, clientConfig);
                     long elapsed = System.currentTimeMillis() - startTime;
                     log.info("视觉分析成功，耗时: {}ms，回答长度: {}", elapsed, result.length());
 
@@ -232,18 +253,18 @@ public class AiServiceImpl implements AiService {
                     // 所有错误都回退到纯文本模式
                     if (errMsg != null && errMsg.contains("Read timed out")) {
                         log.info("检测到超时，切换为纯文本分析模式");
-                        return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：图片分析超时，请描述你看到的画面内容）", personality);
+                        return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：图片分析超时，请描述你看到的画面内容）", personality, clientConfig);
                     }
                     if (errMsg != null && (errMsg.contains("image_url") || errMsg.contains("expected text") || errMsg.contains("400") || errMsg.contains("不支持"))) {
                         log.info("检测到模型不支持视觉，切换为纯文本分析模式");
-                        return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：因模型限制，无法查看截图，请玩家描述画面细节）", personality);
+                        return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：因模型限制，无法查看截图，请玩家描述画面细节）", personality, clientConfig);
                     }
                     log.warn("其他错误，回退到纯文本模式");
-                    return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：图片分析暂时不可用）", personality);
+                    return analyzeWithTextOnly(userId, gameId, effectiveQuery + "（注：图片分析暂时不可用）", personality, clientConfig);
                 }
             } else {
                 log.info("无图片URL，使用纯文本分析模式");
-                return analyzeWithTextOnly(userId, gameId, effectiveQuery, personality);
+                return analyzeWithTextOnly(userId, gameId, effectiveQuery, personality, clientConfig);
             }
         } catch (Exception e) {
             log.error("画面分析失败", e);
@@ -261,8 +282,13 @@ public class AiServiceImpl implements AiService {
     }
 
     private String analyzeWithTextOnly(Long userId, Long gameId, String query, String personality) {
+        return analyzeWithTextOnly(userId, gameId, query, personality, null);
+    }
+
+    private String analyzeWithTextOnly(Long userId, Long gameId, String query, String personality,
+                                       ClientAiConfigDTO clientConfig) {
         String enrichedQuery = "关于《游戏》的问题：" + query + "。请基于游戏知识简洁回答，用分点。";
-        return chatWithPersonality(userId, gameId, enrichedQuery, null, personality);
+        return chatWithPersonality(userId, gameId, enrichedQuery, null, personality, clientConfig);
     }
 
     @Override
@@ -516,23 +542,84 @@ public class AiServiceImpl implements AiService {
         }
     }
 
+    private record ResolvedAiClient(String apiUrl, String apiKey, String model) {}
+
+    private ResolvedAiClient resolveAiClient(ClientAiConfigDTO clientConfig, boolean vision) {
+        if (clientConfig == null) {
+            String model = vision && aiConfig.getVisionModel() != null
+                    ? aiConfig.getVisionModel() : aiConfig.getModel();
+            return new ResolvedAiClient(aiConfig.getApiUrl(), aiConfig.getApiKey(), model);
+        }
+
+        String apiUrl = requireClientValue(clientConfig.getApiUrl(), "API地址", 2048);
+        String apiKey = requireClientValue(clientConfig.getApiKey(), "API Key", 2048);
+        String model = requireClientValue(clientConfig.getModel(), "模型名称", 200);
+        validateExternalAiEndpoint(apiUrl);
+        return new ResolvedAiClient(apiUrl, apiKey, model);
+    }
+
+    private String requireClientValue(String value, String fieldName, int maxLength) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+        if (trimmed.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + "长度超出限制");
+        }
+        return trimmed;
+    }
+
+    void validateExternalAiEndpoint(String apiUrl) {
+        try {
+            java.net.URI uri = java.net.URI.create(apiUrl);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalArgumentException("客户API地址必须使用HTTPS");
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank() || uri.getUserInfo() != null || uri.getFragment() != null) {
+                throw new IllegalArgumentException("客户API地址格式不正确");
+            }
+            String host = uri.getHost().toLowerCase(Locale.ROOT);
+            if ("localhost".equals(host) || host.endsWith(".local")) {
+                throw new IllegalArgumentException("客户API地址不能指向本机或内网");
+            }
+            for (java.net.InetAddress address : java.net.InetAddress.getAllByName(host)) {
+                if (address.isAnyLocalAddress() || address.isLoopbackAddress()
+                        || address.isLinkLocalAddress() || address.isSiteLocalAddress()
+                        || address.isMulticastAddress()) {
+                    throw new IllegalArgumentException("客户API地址不能指向本机或内网");
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("无法验证客户API地址: " + e.getMessage(), e);
+        }
+    }
+
     private String callAiApi(List<Map<String, String>> messages) {
+        return callAiApi(messages, null);
+    }
+
+    private String callAiApi(List<Map<String, String>> messages, ClientAiConfigDTO clientConfig) {
+        ResolvedAiClient resolved = resolveAiClient(clientConfig, false);
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", aiConfig.getModel());
+        requestBody.put("model", resolved.model());
         requestBody.put("messages", messages);
         requestBody.put("temperature", aiConfig.getTemperature());
         requestBody.put("max_tokens", aiConfig.getMaxTokens());
 
         Map<String, String> headers = new HashMap<>();
-        headers.put("Authorization", "Bearer " + aiConfig.getApiKey());
+        headers.put("Authorization", "Bearer " + resolved.apiKey());
         headers.put("Content-Type", "application/json");
 
-        return doCallApi(requestBody, headers);
+        return doCallApi(resolved.apiUrl(), requestBody, headers);
     }
 
-    private String callAiApiStream(List<Map<String, String>> messages, Consumer<String> onDelta) {
+    private String callAiApiStream(List<Map<String, String>> messages, ClientAiConfigDTO clientConfig,
+                                   Consumer<String> onDelta) {
+        ResolvedAiClient resolved = resolveAiClient(clientConfig, false);
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", aiConfig.getModel());
+        requestBody.put("model", resolved.model());
         requestBody.put("messages", messages);
         requestBody.put("temperature", aiConfig.getTemperature());
         requestBody.put("max_tokens", aiConfig.getMaxTokens());
@@ -541,10 +628,11 @@ public class AiServiceImpl implements AiService {
         java.net.HttpURLConnection conn = null;
         try {
             String jsonBody = objectMapper.writeValueAsString(requestBody);
-            conn = (java.net.HttpURLConnection) new java.net.URL(aiConfig.getApiUrl()).openConnection();
+            conn = (java.net.HttpURLConnection) new java.net.URL(resolved.apiUrl()).openConnection();
+            conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
-            conn.setRequestProperty("Authorization", "Bearer " + aiConfig.getApiKey());
+            conn.setRequestProperty("Authorization", "Bearer " + resolved.apiKey());
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "text/event-stream");
             conn.setConnectTimeout(5000);
@@ -628,34 +716,38 @@ public class AiServiceImpl implements AiService {
         }
     }
 
-    private String callVisionAiApi(List<Map<String, Object>> messages) {
+    private String callVisionAiApi(List<Map<String, Object>> messages, ClientAiConfigDTO clientConfig) {
+        ResolvedAiClient resolved = resolveAiClient(clientConfig, true);
         Map<String, Object> requestBody = new HashMap<>();
-        String visionModel = aiConfig.getVisionModel() != null ? aiConfig.getVisionModel() : aiConfig.getModel();
-        requestBody.put("model", visionModel);
+        requestBody.put("model", resolved.model());
         requestBody.put("messages", messages);
         requestBody.put("temperature", aiConfig.getTemperature());
         requestBody.put("max_tokens", aiConfig.getMaxTokens());
 
         Map<String, String> headers = new HashMap<>();
-        headers.put("Authorization", "Bearer " + aiConfig.getApiKey());
+        headers.put("Authorization", "Bearer " + resolved.apiKey());
         headers.put("Content-Type", "application/json");
 
         try {
-            return doCallApi(requestBody, headers);
+            return doCallApi(resolved.apiUrl(), requestBody, headers);
         } catch (Exception e) {
             // 如果thinking参数不支持，移除后重试
             if (e.getMessage() != null && e.getMessage().contains("thinking")) {
                 log.warn("模型不支持thinking参数，移除后重试");
                 requestBody.remove("thinking");
-                return doCallApi(requestBody, headers);
+                return doCallApi(resolved.apiUrl(), requestBody, headers);
             }
             throw e;
         }
     }
 
     private String doCallApi(Map<String, Object> requestBody, Map<String, String> headers) {
+        return doCallApi(aiConfig.getApiUrl(), requestBody, headers);
+    }
+
+    private String doCallApi(String apiUrl, Map<String, Object> requestBody, Map<String, String> headers) {
         try {
-            String response = HttpPost(aiConfig.getApiUrl(), requestBody, headers);
+            String response = HttpPost(apiUrl, requestBody, headers);
 
             JsonNode root = objectMapper.readTree(response);
 
@@ -684,6 +776,7 @@ public class AiServiceImpl implements AiService {
             log.info("发送API请求: URL={}, 请求体大小={}字节", url, jsonBody.length());
 
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
