@@ -40,11 +40,19 @@ logging:
     org.springframework.boot.autoconfigure.security: ERROR
 
 game-mate:
+  cors:
+    allowed-origins: ${GAME_MATE_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4173,gamemate://app}
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:86400000}
   file:
     upload-path: ./uploads/
+  firewall:
+    enabled: ${GAME_MATE_FIREWALL_ENABLED:true}
+    general-requests-per-minute: ${GAME_MATE_FIREWALL_GENERAL_PER_MINUTE:240}
+    auth-attempts-per-five-minutes: ${GAME_MATE_FIREWALL_AUTH_PER_FIVE_MINUTES:12}
+    max-json-bytes: ${GAME_MATE_FIREWALL_MAX_JSON_BYTES:4194304}
+    max-upload-bytes: ${GAME_MATE_FIREWALL_MAX_UPLOAD_BYTES:115343360}
   ai:
     enabled: ${AI_ENABLED:false}
     provider: ${AI_PROVIDER:qwen}
