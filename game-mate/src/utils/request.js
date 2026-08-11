@@ -1,9 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
+import { buildServerUrl, resolveServerAssets } from '../config/runtime'
 
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: buildServerUrl('/api'),
   timeout: 120000
 })
 
@@ -23,6 +24,7 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   response => {
     const res = response.data
+    resolveServerAssets(res)
     if (res.code === 200) {
       return res
     } else if (res.code === 401) {
