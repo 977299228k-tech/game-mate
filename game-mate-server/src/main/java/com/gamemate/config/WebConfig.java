@@ -5,66 +5,73 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @Configuration
 public class WebConfig {
 
+    @Value("${game-mate.cors.allowed-origins:http://localhost:3000,http://localhost:4173,gamemate://app}")
+    private String allowedOrigins;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
-        log.info("【WebConfig】创建 PasswordEncoder Bean");
         return new BCryptPasswordEncoder();
     }
 
     @Bean
     public RestTemplate restTemplate() {
-        log.info("【WebConfig】创建 RestTemplate Bean");
         return new RestTemplate();
     }
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+
+        configuration.setAllowedOrigins(origins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+        configuration.setExposedHeaders(List.of("Content-Disposition"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public OncePerRequestFilter requestLoggingFilter() {
-        log.info("【WebConfig】创建请求日志过滤器");
         return new OncePerRequestFilter() {
             @Override
             protected void doFilterInternal(HttpServletRequest request,
                                             HttpServletResponse response,
                                             FilterChain filterChain) throws ServletException, IOException {
-                String method = request.getMethod();
-                String uri = request.getRequestURI();
-                String origin = request.getHeader("Origin");
-
-                log.info("【RequestFilter】收到请求: {} {} | Origin: {} | Content-Type: {}",
-                         method, uri, origin, request.getContentType());
-
-                if ("OPTIONS".equals(method)) {
-                    log.info("【RequestFilter】OPTIONS 预检请求，设置 CORS 头并直接返回");
-                    response.setHeader("Access-Control-Allow-Origin", origin != null ? origin : "*");
-                    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-                    response.setHeader("Access-Control-Allow-Headers", "*");
-                    response.setHeader("Access-Control-Allow-Credentials", "true");
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    return;
-                }
-
-                if (origin != null) {
-                    response.setHeader("Access-Control-Allow-Origin", origin);
-                    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-                    response.setHeader("Access-Control-Allow-Headers", "*");
-                    response.setHeader("Access-Control-Allow-Credentials", "true");
-                }
-
-                log.info("【RequestFilter】放行请求: {} {}", method, uri);
+                log.info("Request {} {} | Origin: {} | Content-Type: {}",
+                        request.getMethod(),
+                        request.getRequestURI(),
+                        request.getHeader("Origin"),
+                        request.getContentType());
                 filterChain.doFilter(request, response);
             }
         };
     }
 }
+
