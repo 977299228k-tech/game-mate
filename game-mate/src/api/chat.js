@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import { buildServerUrl } from '../config/runtime'
 
 export function getChatMessages(gameId) {
   return request.get('/chat/messages', { params: { gameId } })
@@ -14,7 +15,7 @@ export function sendMessageWithPersonality(data) {
 
 export async function streamMessageWithPersonality(data, { onDelta, signal } = {}) {
   const token = localStorage.getItem('token')
-  const response = await fetch('/api/chat/messages-with-personality/stream', {
+  const response = await fetch(buildServerUrl('/api/chat/messages-with-personality/stream'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
