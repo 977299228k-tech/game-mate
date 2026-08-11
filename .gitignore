@@ -16,6 +16,8 @@ desktop.ini
 # ===== Frontend (game-mate) =====
 game-mate/node_modules/
 game-mate/dist/
+game-mate/desktop-dist/
+game-mate/release/
 game-mate/.env
 game-mate/.env.local
 game-mate/.env.*.local
