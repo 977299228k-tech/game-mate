@@ -1,0 +1,78 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: game_mate
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - backend
+
+  api:
+    build:
+      context: ../game-mate-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/game_mate?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      GAME_MATE_ALLOWED_ORIGINS: ${GAME_MATE_ALLOWED_ORIGINS:-gamemate://app}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-qwen}
+      AI_API_URL: ${AI_API_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-qwen-plus}
+      AI_VISION_MODEL: ${AI_VISION_MODEL:-qwen-vl-plus}
+      GAME_MATE_FIREWALL_ENABLED: ${GAME_MATE_FIREWALL_ENABLED:-true}
+      GAME_MATE_FIREWALL_GENERAL_PER_MINUTE: ${GAME_MATE_FIREWALL_GENERAL_PER_MINUTE:-240}
+      GAME_MATE_FIREWALL_AUTH_PER_FIVE_MINUTES: ${GAME_MATE_FIREWALL_AUTH_PER_FIVE_MINUTES:-12}
+      TZ: Asia/Shanghai
+    volumes:
+      - uploads:/data/game-mate/uploads
+    expose:
+      - "8080"
+    networks:
+      - backend
+
+  gateway:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+
+volumes:
+  mysql-data:
+  uploads:
+
+networks:
+  backend:
+    driver: bridge
