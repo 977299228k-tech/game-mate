@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
 const routes = [
   {
@@ -56,7 +56,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: window.gameMateDesktop?.isDesktop ? createWebHashHistory() : createWebHistory(),
   routes
 })
 
