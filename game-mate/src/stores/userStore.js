@@ -86,6 +86,7 @@ export const useUserStore = defineStore('user', () => {
     } catch (error) {
       console.error('获取用户信息失败', error)
     }
+    return false
   }
 
   async function updateUserInfo(info) {
