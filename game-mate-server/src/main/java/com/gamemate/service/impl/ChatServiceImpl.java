@@ -1,6 +1,7 @@
 package com.gamemate.service.impl;
 
 import com.gamemate.config.AiConfig;
+import com.gamemate.common.UnauthorizedException;
 import com.gamemate.dto.ChatMessageDTO;
 import com.gamemate.dto.ClientAiConfigDTO;
 import com.gamemate.entity.ChatMessage;
@@ -29,18 +30,14 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public List<ChatMessageVO> getChatHistory(Long userId, Long gameId) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        requireUserId(userId);
         List<ChatMessage> messages = chatMessageMapper.findByUserIdAndGameId(userId, gameId);
         return messages.stream().map(this::convertToVO).collect(Collectors.toList());
     }
 
     @Override
     public ChatMessageVO sendMessage(Long userId, ChatMessageDTO dto) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        requireUserId(userId);
         ChatMessage userMessage = new ChatMessage();
         userMessage.setUserId(userId);
         userMessage.setGameId(dto.getGameId());
@@ -68,18 +65,23 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public List<ChatMessageVO> getRecentMessages(Long userId) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        requireUserId(userId);
         List<ChatMessage> messages = chatMessageMapper.findByUserId(userId, 50);
         return messages.stream().map(this::convertToVO).collect(Collectors.toList());
     }
 
     @Override
+    public List<ChatMessageVO> getRecentMessages(Long userId, Long gameId, int limit) {
+        Long effectiveUserId = requireUserId(userId);
+        List<ChatMessage> messages = gameId == null
+                ? chatMessageMapper.findByUserId(effectiveUserId, Math.max(1, Math.min(limit, 100)))
+                : chatMessageMapper.findRecentByUserIdAndGameId(effectiveUserId, gameId, Math.max(1, Math.min(limit, 100)));
+        return messages.stream().map(this::convertToVO).collect(Collectors.toList());
+    }
+
+    @Override
     public ChatMessageVO analyzeScreen(Long userId, ChatMessageDTO dto, MultipartFile image) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        requireUserId(userId);
         ChatMessage userMessage = new ChatMessage();
         userMessage.setUserId(userId);
         userMessage.setGameId(dto.getGameId());
@@ -137,9 +139,7 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public ChatMessageVO analyzeScreenWithPersonality(Long userId, ChatMessageDTO dto, String imageBase64,
                                                       String personality, ClientAiConfigDTO clientConfig) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        requireUserId(userId);
         ChatMessage userMessage = new ChatMessage();
         userMessage.setUserId(userId);
         userMessage.setGameId(dto.getGameId());
@@ -181,9 +181,7 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public ChatMessageVO sendMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
                                                     ClientAiConfigDTO clientConfig) {
-        if (userId == null) {
-            userId = 1L;
-        }
+        userId = requireUserId(userId);
         ChatMessage userMessage = new ChatMessage();
         userMessage.setUserId(userId);
         userMessage.setGameId(dto.getGameId());
@@ -219,7 +217,7 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public ChatMessageVO streamMessageWithPersonality(Long userId, ChatMessageDTO dto, String personality,
                                                       ClientAiConfigDTO clientConfig, Consumer<String> onDelta) {
-        Long effectiveUserId = userId != null ? userId : 1L;
+        Long effectiveUserId = requireUserId(userId);
         List<Map<String, String>> history = getRecentHistory(effectiveUserId, dto.getGameId(), 10);
 
         ChatMessage userMessage = new ChatMessage();
@@ -248,12 +246,9 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private List<Map<String, String>> getRecentHistory(Long userId, Long gameId, int limit) {
-        if (userId == null) {
-            userId = 1L;
-        }
-        List<ChatMessage> messages = chatMessageMapper.findByUserIdAndGameIdOrderByCreateTimeAsc(userId, gameId);
-        int start = Math.max(0, messages.size() - limit);
-        List<ChatMessage> recentMessages = messages.subList(start, messages.size());
+        Long effectiveUserId = requireUserId(userId);
+        List<ChatMessage> recentMessages = chatMessageMapper.findRecentByUserIdAndGameId(
+                effectiveUserId, gameId, Math.max(1, Math.min(limit, 50)));
 
         return recentMessages.stream()
                 .filter(m -> "user".equals(m.getRole()) || "assistant".equals(m.getRole()))
@@ -264,6 +259,13 @@ public class ChatServiceImpl implements ChatService {
                     return map;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private Long requireUserId(Long userId) {
+        if (userId == null) {
+            throw new UnauthorizedException();
+        }
+        return userId;
     }
 
     private String generateFallbackResponse(String userMessage) {
