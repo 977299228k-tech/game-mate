@@ -17,6 +17,9 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
     @Select("SELECT * FROM chat_message WHERE user_id = #{userId} ORDER BY create_time DESC LIMIT #{limit}")
     List<ChatMessage> findByUserId(@Param("userId") Long userId, @Param("limit") int limit);
 
+    @Select("SELECT * FROM (SELECT * FROM chat_message WHERE user_id = #{userId} AND game_id = #{gameId} ORDER BY create_time DESC LIMIT #{limit}) recent ORDER BY create_time ASC")
+    List<ChatMessage> findRecentByUserIdAndGameId(@Param("userId") Long userId, @Param("gameId") Long gameId, @Param("limit") int limit);
+
     @Select("SELECT * FROM chat_message WHERE user_id = #{userId} AND game_id = #{gameId} ORDER BY create_time ASC")
     List<ChatMessage> findByUserIdAndGameIdOrderByCreateTimeAsc(@Param("userId") Long userId, @Param("gameId") Long gameId);
 }
