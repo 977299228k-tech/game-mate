@@ -33,12 +33,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserVO register(RegisterDTO registerDTO) {
+        if (registerDTO.getPhone() == null || !registerDTO.getPhone().matches("^1[3-9]\\d{9}$")) {
+            throw new IllegalArgumentException("手机号格式不正确");
+        }
         if (!registerDTO.getPassword().equals(registerDTO.getConfirmPassword())) {
             throw new RuntimeException("两次密码不一致");
         }
         User existPhoneUser = userMapper.findByPhone(registerDTO.getPhone());
         if (existPhoneUser != null) {
             throw new RuntimeException("手机号已注册");
+        }
+        if (registerDTO.getEmail() != null && !registerDTO.getEmail().isBlank()
+                && userMapper.findByEmail(registerDTO.getEmail()) != null) {
+            throw new RuntimeException("邮箱已注册");
         }
 
         User user = new User();
@@ -79,10 +86,21 @@ public class UserServiceImpl implements UserService {
             user.setNickname(userVO.getNickname());
         }
         if (userVO.getPhone() != null) {
+            if (!userVO.getPhone().matches("^1[3-9]\\d{9}$")) {
+                throw new IllegalArgumentException("手机号格式不正确");
+            }
+            User existingPhoneUser = userMapper.findByPhone(userVO.getPhone());
+            if (existingPhoneUser != null && !existingPhoneUser.getId().equals(userId)) {
+                throw new RuntimeException("手机号已注册");
+            }
             user.setPhone(userVO.getPhone());
             user.setAccount(userVO.getPhone());
         }
         if (userVO.getEmail() != null) {
+            User existingEmailUser = userMapper.findByEmail(userVO.getEmail());
+            if (existingEmailUser != null && !existingEmailUser.getId().equals(userId)) {
+                throw new RuntimeException("邮箱已注册");
+            }
             user.setEmail(userVO.getEmail());
         }
         if (userVO.getAvatar() != null) {
@@ -116,12 +134,9 @@ public class UserServiceImpl implements UserService {
         if (hours == null || hours <= 0) {
             throw new IllegalArgumentException("充值时长必须大于0");
         }
-        User user = userMapper.selectById(userId);
-        if (user == null) {
+        if (userMapper.incrementBalance(userId, hours) == 0) {
             throw new RuntimeException("用户不存在");
         }
-        user.setBalance(user.getBalance() + hours);
-        userMapper.updateById(user);
     }
 
     @Override
@@ -129,15 +144,15 @@ public class UserServiceImpl implements UserService {
         if (hours == null || hours <= 0) {
             throw new IllegalArgumentException("扣减时长必须大于0");
         }
+        int updated = userMapper.decrementBalanceIfEnough(userId, hours);
+        if (updated == 1) {
+            return;
+        }
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
-        if (user.getBalance() < hours) {
-            throw new RuntimeException("余额不足");
-        }
-        user.setBalance(user.getBalance() - hours);
-        userMapper.updateById(user);
+        throw new RuntimeException("余额不足");
     }
 
     private UserVO convertToVO(User user, boolean withToken) {
