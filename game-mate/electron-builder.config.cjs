@@ -15,7 +15,8 @@ const publish = runtimeConfig.updateUrl
 const win = {
   target: [{ target: 'nsis', arch: ['x64'] }],
   artifactName: 'AI电竞经理-Setup-${version}-${arch}.${ext}',
-  verifyUpdateCodeSignature: true
+  // Local unsigned builds must not block on Windows certificate verification.
+  verifyUpdateCodeSignature: process.env.VERIFY_UPDATE_CODE_SIGNATURE === 'true'
 }
 if (process.env.WINDOWS_PUBLISHER_NAME) {
   win.publisherName = process.env.WINDOWS_PUBLISHER_NAME
@@ -26,7 +27,7 @@ module.exports = {
   productName: 'AI电竞经理',
   copyright: 'Copyright © 2026 AI电竞经理',
   asar: true,
-  compression: 'maximum',
+  compression: 'normal',
   forceCodeSigning: process.env.REQUIRE_CODE_SIGNING === 'true',
   electronFuses: {
     runAsNode: false,
