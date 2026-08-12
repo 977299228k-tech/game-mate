@@ -154,7 +154,7 @@ export const useAiChatStore = defineStore('aiChat', () => {
   watch(messages, (val) => {
     const trimmed = val.slice(-50)
     saveJSON(MESSAGES_KEY, trimmed)
-  }, { deep: true })
+  }, { deep: true, flush: 'sync' })
 
   watch(settings, (val) => {
     saveJSON(SETTINGS_KEY, val)
