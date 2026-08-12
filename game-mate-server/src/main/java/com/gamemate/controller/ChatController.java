@@ -51,7 +51,11 @@ public class ChatController {
         Long userId = (Long) request.getAttribute("userId");
         
         ChatMessageDTO dto = new ChatMessageDTO();
-        dto.setGameId(((Number) payload.get("gameId")).longValue());
+        Object rawGameId = payload.get("gameId");
+        if (rawGameId == null) {
+            return Result.error(400, "游戏ID不能为空");
+        }
+        dto.setGameId(Long.valueOf(rawGameId.toString()));
         dto.setRole((String) payload.getOrDefault("role", "user"));
         dto.setContent((String) payload.get("content"));
         
@@ -114,7 +118,10 @@ public class ChatController {
             @RequestParam(required = false) Long gameId,
             @RequestParam(defaultValue = "20") int limit) {
         Long userId = (Long) request.getAttribute("userId");
-        return Result.success(chatService.getRecentMessages(userId));
+        if (limit < 1 || limit > 100) {
+            return Result.error(400, "limit必须在1到100之间");
+        }
+        return Result.success(chatService.getRecentMessages(userId, gameId, limit));
     }
 
     @PostMapping("/analyze")
