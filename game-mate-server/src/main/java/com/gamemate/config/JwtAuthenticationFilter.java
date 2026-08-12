@@ -28,6 +28,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = getTokenFromRequest(request);
 
+        if (token != null && !jwtUtil.validateToken(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"未授权或登录已过期\",\"data\":null}");
+            return;
+        }
+
         if (token != null
                 && SecurityContextHolder.getContext().getAuthentication() == null
                 && jwtUtil.validateToken(token)) {
@@ -41,6 +48,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 log.debug("【JWT Filter】验证成功，userId={}", userId);
             } catch (Exception e) {
                 log.warn("【JWT Filter】解析token失败: {}", e.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":401,\"message\":\"未授权或登录已过期\",\"data\":null}");
+                return;
             }
         }
 
