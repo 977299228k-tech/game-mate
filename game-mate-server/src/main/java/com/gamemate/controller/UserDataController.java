@@ -74,7 +74,9 @@ public class UserDataController {
             map.put("extraId", e.getExtraId());
             map.put("totalHours", e.getTotalHours());
             map.put("usedHours", e.getUsedHours());
-            map.put("remainingHours", e.getTotalHours() - e.getUsedHours());
+            int totalHours = e.getTotalHours() == null ? 0 : e.getTotalHours();
+            int usedHours = e.getUsedHours() == null ? 0 : e.getUsedHours();
+            map.put("remainingHours", Math.max(0, totalHours - usedHours));
             return map;
         }).collect(Collectors.toList());
         data.put("extraServices", extras);
@@ -92,6 +94,9 @@ public class UserDataController {
     public Result<CustomGame> addCustomGame(HttpServletRequest request, @RequestBody Map<String, String> body) {
         Long userId = (Long) request.getAttribute("userId");
         String name = body.get("name");
+        if (name == null || name.isBlank() || name.length() > 100) {
+            return Result.error(400, "游戏名称不能为空且不能超过100个字符");
+        }
         String genre = body.get("genre");
         String icon = body.get("icon");
         String color = body.get("color");
@@ -153,7 +158,9 @@ public class UserDataController {
             map.put("extraId", s.getExtraId());
             map.put("totalHours", s.getTotalHours());
             map.put("usedHours", s.getUsedHours());
-            map.put("remainingHours", s.getTotalHours() - s.getUsedHours());
+            int totalHours = s.getTotalHours() == null ? 0 : s.getTotalHours();
+            int usedHours = s.getUsedHours() == null ? 0 : s.getUsedHours();
+            map.put("remainingHours", Math.max(0, totalHours - usedHours));
             return map;
         }).collect(Collectors.toList());
         return Result.success(result);
