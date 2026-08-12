@@ -4,11 +4,14 @@ import com.gamemate.dto.OrderCreateDTO;
 import com.gamemate.entity.ExtraService;
 import com.gamemate.entity.Order;
 import com.gamemate.entity.Plan;
+import com.gamemate.entity.OrderExtra;
 import com.gamemate.mapper.ExtraServiceMapper;
 import com.gamemate.mapper.OrderMapper;
+import com.gamemate.mapper.OrderExtraMapper;
 import com.gamemate.mapper.PlanMapper;
 import com.gamemate.service.OrderService;
 import com.gamemate.service.UserService;
+import com.gamemate.service.UserDataService;
 import com.gamemate.vo.ExtraServiceVO;
 import com.gamemate.vo.OrderVO;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +30,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final PlanMapper planMapper;
     private final ExtraServiceMapper extraServiceMapper;
+    private final OrderExtraMapper orderExtraMapper;
     private final UserService userService;
+    private final UserDataService userDataService;
 
     @Override
     @Transactional
@@ -59,6 +64,13 @@ public class OrderServiceImpl implements OrderService {
         order.setPayMethod(dto.getPayMethod() != null ? dto.getPayMethod() : "wechat");
         orderMapper.insert(order);
 
+        for (ExtraService extra : extraServices) {
+            OrderExtra orderExtra = new OrderExtra();
+            orderExtra.setOrderId(order.getId());
+            orderExtra.setExtraId(extra.getId());
+            orderExtraMapper.insert(orderExtra);
+        }
+
         return convertToVO(order, plan, extraServices);
     }
 
@@ -72,20 +84,29 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此订单");
         }
-        if ("PAID".equals(order.getStatus())) {
-            throw new RuntimeException("订单已支付");
+        if (orderMapper.markPaidIfUnpaid(userId, orderId, payMethod) != 1) {
+            throw new RuntimeException("订单已支付或状态已变更，请刷新后重试");
         }
 
+        userService.addBalance(userId, order.getHours());
+
+        List<OrderExtra> orderExtras = orderExtraMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<OrderExtra>()
+                        .eq("order_id", orderId));
+        for (OrderExtra orderExtra : orderExtras) {
+            ExtraService extra = extraServiceMapper.selectById(orderExtra.getExtraId());
+            if (extra != null) {
+                // 增值服务按本订单套餐时长开通，后续可由 extra_service.hours 覆盖。
+                userDataService.purchaseExtraService(userId, extra.getId(), order.getHours(), extra.getPrice());
+            }
+        }
+
+        Plan plan = planMapper.selectById(order.getPlanId());
         order.setStatus("PAID");
         if (payMethod != null) {
             order.setPayMethod(payMethod);
         }
-        orderMapper.updateById(order);
-
-        userService.addBalance(userId, order.getHours());
-
-        Plan plan = planMapper.selectById(order.getPlanId());
-        return convertToVO(order, plan, new ArrayList<>());
+        return convertToVO(order, plan, loadExtras(orderId));
     }
 
     @Override
@@ -109,7 +130,18 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("无权查看此订单");
         }
         Plan plan = planMapper.selectById(order.getPlanId());
-        return convertToVO(order, plan, new ArrayList<>());
+        return convertToVO(order, plan, loadExtras(orderId));
+    }
+
+    private List<ExtraService> loadExtras(Long orderId) {
+        return orderExtraMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<OrderExtra>()
+                                .eq("order_id", orderId))
+                .stream()
+                .map(OrderExtra::getExtraId)
+                .map(extraServiceMapper::selectById)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     private OrderVO convertToVO(Order order, Plan plan, List<ExtraService> extraServices) {
