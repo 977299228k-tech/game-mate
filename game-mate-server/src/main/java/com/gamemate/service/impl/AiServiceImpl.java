@@ -424,7 +424,11 @@ public class AiServiceImpl implements AiService {
                     }
                 }
             } else {
-                filePath = Paths.get(imageUrl).toAbsolutePath().normalize();
+                throw new IllegalArgumentException("图片路径必须位于/uploads/目录下");
+            }
+
+            if (!filePath.startsWith(basePath)) {
+                throw new IllegalArgumentException("禁止访问上传目录之外的文件");
             }
 
             log.info("最终图片路径: {}, 基础路径: {}", filePath, basePath);
@@ -747,7 +751,7 @@ public class AiServiceImpl implements AiService {
 
     private String doCallApi(String apiUrl, Map<String, Object> requestBody, Map<String, String> headers) {
         try {
-            String response = HttpPost(apiUrl, requestBody, headers);
+            String response = httpPost(apiUrl, requestBody, headers);
 
             JsonNode root = objectMapper.readTree(response);
 
@@ -768,14 +772,15 @@ public class AiServiceImpl implements AiService {
         }
     }
 
-    private String HttpPost(String url, Object body, Map<String, String> headers) {
+    private String httpPost(String url, Object body, Map<String, String> headers) {
+        java.net.HttpURLConnection conn = null;
         try {
             String jsonBody = objectMapper.writeValueAsString(body);
             long startTime = System.currentTimeMillis();
 
             log.info("发送API请求: URL={}, 请求体大小={}字节", url, jsonBody.length());
 
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
             conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
@@ -829,6 +834,10 @@ public class AiServiceImpl implements AiService {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("API调用失败: " + e.getMessage());
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
