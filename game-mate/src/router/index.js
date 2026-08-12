@@ -21,7 +21,7 @@ const routes = [
     path: '/home',
     name: 'Home',
     component: () => import('../views/Home.vue'),
-    meta: { title: 'GameMate - AI电竞伴侣' }
+    meta: { title: 'GameMate - AI电竞伴侣', requiresAuth: true }
   },
   {
     path: '/ai-chat',
