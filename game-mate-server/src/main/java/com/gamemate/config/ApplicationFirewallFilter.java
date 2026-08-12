@@ -158,10 +158,7 @@ public class ApplicationFirewallFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String address = request.getHeader("X-Real-IP");
-        if (address == null || address.isBlank()) {
-            address = request.getRemoteAddr();
-        }
+        String address = request.getRemoteAddr();
         int comma = address.indexOf(',');
         if (comma >= 0) {
             address = address.substring(0, comma);
