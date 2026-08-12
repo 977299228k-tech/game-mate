@@ -16,7 +16,7 @@
             :key="p.id"
             class="personality-item"
             :class="{ 
-              active: selectedPersonality === p.name,
+              active: selectedPersonality === p.key,
               locked: !p.isDefault && !hasPersonalityCustom 
             }"
             @click="updatePersonality(p)"
@@ -52,7 +52,7 @@
             :key="v.id"
             class="voice-item"
             :class="{ 
-              active: selectedVoice === v.name,
+              active: selectedVoice === v.key,
               locked: !v.isDefault && !hasVoiceCustom 
             }"
             @click="updateVoice(v)"
@@ -149,10 +149,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, ArrowRight, SwitchButton } from '@element-plus/icons-vue'
 import { useUserStore } from '../stores/userStore'
 import { useAiChatStore } from '../stores/aiChatStore'
+import { useGameStore } from '../stores/gameStore'
 
 const router = useRouter()
 const userStore = useUserStore()
 const aiChatStore = useAiChatStore()
+const gameStore = useGameStore()
 
 const showCustomDialog = ref(false)
 
@@ -162,20 +164,20 @@ const customForm = reactive({
 })
 
 const personalities = [
-  { id: 1, name: '温柔治愈', emoji: '🌸', isDefault: true },
-  { id: 2, name: '激励热血', emoji: '🔥', isDefault: false },
-  { id: 3, name: '犀利互怼', emoji: '😈', isDefault: false },
-  { id: 4, name: '幽默风趣', emoji: '😂', isDefault: false },
-  { id: 5, name: '冷静分析', emoji: '🧊', isDefault: false }
+  { id: 1, key: 'friendly', name: '温柔治愈', emoji: '🌸', isDefault: true },
+  { id: 2, key: 'passionate', name: '激励热血', emoji: '🔥', isDefault: false },
+  { id: 3, key: 'roaster', name: '犀利互怼', emoji: '😈', isDefault: false },
+  { id: 4, key: 'funny', name: '幽默风趣', emoji: '😂', isDefault: false },
+  { id: 5, key: 'strategist', name: '冷静分析', emoji: '🧊', isDefault: false }
 ]
 
 const voices = [
-  { id: 1, name: '甜美女声', emoji: '👩', isDefault: true },
-  { id: 2, name: '御姐声线', emoji: '👩‍🦰', isDefault: false },
-  { id: 3, name: '正太声线', emoji: '👦', isDefault: false },
-  { id: 4, name: '火狐声线', emoji: '🦊', isDefault: false },
-  { id: 5, name: '电子音', emoji: '🤖', isDefault: false },
-  { id: 6, name: '自定义声线', emoji: '✨', isDefault: false }
+  { id: 1, key: 'default', name: '甜美女声', emoji: '👩', isDefault: true },
+  { id: 2, key: 'mature', name: '御姐声线', emoji: '👩‍🦰', isDefault: false },
+  { id: 3, key: 'child', name: '正太声线', emoji: '👦', isDefault: false },
+  { id: 4, key: 'fox', name: '火狐声线', emoji: '🦊', isDefault: false },
+  { id: 5, key: 'electronic', name: '电子音', emoji: '🤖', isDefault: false },
+  { id: 6, key: 'custom', name: '自定义声线', emoji: '✨', isDefault: false }
 ]
 
 const hasPersonalityCustom = computed(() => {
@@ -187,12 +189,12 @@ const hasVoiceCustom = computed(() => {
 })
 
 const selectedPersonality = computed({
-  get: () => aiChatStore.settings.personality || '温柔治愈',
+  get: () => aiChatStore.settings.personality || 'friendly',
   set: (val) => aiChatStore.updateSettings({ personality: val })
 })
 
 const selectedVoice = computed({
-  get: () => aiChatStore.settings.voice || '甜美女声',
+  get: () => aiChatStore.settings.voice || 'default',
   set: (val) => aiChatStore.updateSettings({ voice: val })
 })
 
@@ -236,8 +238,8 @@ function updatePersonality(p) {
     ElMessage.warning('请先充值「专属AI性格定制」解锁更多人格')
     return
   }
-  selectedPersonality.value = p.name
-  aiChatStore.updateSettings({ personality: p.name })
+  selectedPersonality.value = p.key
+  aiChatStore.updateSettings({ personality: p.key })
   ElMessage.success(`已切换为${p.name}人格`)
 }
 
@@ -246,8 +248,8 @@ function updateVoice(v) {
     ElMessage.warning('请先充值「声优声线定制」解锁更多声线')
     return
   }
-  selectedVoice.value = v.name
-  aiChatStore.updateSettings({ voice: v.name })
+  selectedVoice.value = v.key
+  aiChatStore.updateSettings({ voice: v.key })
   ElMessage.success(`已切换为${v.name}`)
 }
 
@@ -269,20 +271,20 @@ function toggleFeature(key) {
 onMounted(() => {
   const settings = aiChatStore.settings
   if (settings.personality) {
-    const personality = personalities.find(p => p.name === settings.personality)
+    const personality = personalities.find(p => p.key === settings.personality)
     if (personality) {
       const canUse = personality.isDefault || hasPersonalityCustom.value
       if (!canUse) {
-        aiChatStore.updateSettings({ personality: '温柔治愈' })
+        aiChatStore.updateSettings({ personality: 'friendly' })
       }
     }
   }
   if (settings.voice) {
-    const voice = voices.find(v => v.name === settings.voice)
+    const voice = voices.find(v => v.key === settings.voice)
     if (voice) {
       const canUse = voice.isDefault || hasVoiceCustom.value
       if (!canUse) {
-        aiChatStore.updateSettings({ voice: '甜美女声' })
+        aiChatStore.updateSettings({ voice: 'default' })
       }
     }
   }
@@ -295,8 +297,10 @@ function saveCustom() {
   }
   personalities.push({
     id: personalities.length + 1,
+    key: `custom-${Date.now()}`,
     name: customForm.name,
-    emoji: '✨'
+    emoji: '✨',
+    isDefault: false
   })
   showCustomDialog.value = false
   customForm.name = ''
@@ -310,6 +314,8 @@ function clearData() {
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
+    aiChatStore.clearAll()
+    gameStore.reset()
     ElMessage.success('数据已清除')
   }).catch(() => {})
 }
@@ -319,6 +325,8 @@ function handleLogout() {
     confirmButtonText: '确定退出',
     cancelButtonText: '取消'
   }).then(() => {
+    aiChatStore.resetToDefault()
+    gameStore.reset()
     userStore.logout()
     router.push('/login')
   }).catch(() => {})
