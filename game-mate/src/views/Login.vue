@@ -173,6 +173,8 @@ async function handleLogin() {
     } else {
       ElMessage.error(result.message || '登录失败')
     }
+  } catch (error) {
+    ElMessage.error(error.message || '登录失败，请稍后重试')
   } finally {
     loading.value = false
   }
