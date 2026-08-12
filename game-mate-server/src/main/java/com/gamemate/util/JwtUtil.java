@@ -59,7 +59,11 @@ public class JwtUtil {
 
     public Long getUserId(String token) {
         Claims claims = parseToken(token);
-        return ((Number) claims.get("userId")).longValue();
+        Object userId = claims.get("userId");
+        if (!(userId instanceof Number)) {
+            throw new IllegalArgumentException("JWT缺少有效用户ID");
+        }
+        return ((Number) userId).longValue();
     }
 
     public String getAccount(String token) {
