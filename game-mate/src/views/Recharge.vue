@@ -266,12 +266,15 @@ async function confirmPay() {
   try {
     const orderRes = await createOrder({
       planId: selectedPlan.value.id,
-      extraIds: [],
+      extraIds: selectedExtras.value,
       payMethod: selectedPay.value
     })
+    if (!orderRes?.data?.id) {
+      throw new Error('订单创建失败，请稍后重试')
+    }
     await payOrder(orderRes.data.id, selectedPay.value)
     await userStore.fetchUserInfo()
-    aiChatStore.userData.balance = userStore.balance
+    aiChatStore.updateUserData({ balance: userStore.balance })
 
     ElMessage.success(`支付成功！已充值 ${selectedPlan.value.hours} 小时`)
     showPayDialog.value = false
