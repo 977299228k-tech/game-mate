@@ -41,6 +41,7 @@
                 :alt="game.name" 
                 class="game-icon-img"
                 @error="handleImageError($event, game)" 
+                @load="handleImageLoad(game)"
               />
               <span v-else>{{ game.icon }}</span>
             </div>
@@ -118,6 +119,7 @@
                   :alt="selectedGame?.name" 
                   class="visual-img"
                   @error="handleImageError($event, selectedGame)"
+                  @load="handleImageLoad(selectedGame)"
                 />
                 <span v-else class="visual-emoji">{{ selectedGame?.icon }}</span>
               </div>
@@ -170,6 +172,7 @@
                   :alt="selectedGame?.name" 
                   class="visual-img"
                   @error="handleImageError($event, selectedGame)"
+                  @load="handleImageLoad(selectedGame)"
                 />
                 <span v-else class="visual-emoji">{{ selectedGame?.icon }}</span>
               </div>
@@ -524,6 +527,7 @@ const isStreamingReply = ref(false)
 const isAnalyzing = ref(false)
 const analyzingSeconds = ref(0)
 let requestTimer = null
+let metricsInterval = null
 const latency = ref(120)
 const recognitionRate = ref(95)
 const objectCount = ref(3)
@@ -594,6 +598,12 @@ function handleImageError(event, game) {
   }
 }
 
+function handleImageLoad(game) {
+  if (game?.id) {
+    delete imageLoadFailed.value[game.id]
+  }
+}
+
 const newGame = reactive({
   name: '',
   genre: '',
@@ -634,6 +644,9 @@ const voiceOptions = [
 ]
 
 function selectGame(game) {
+  if (selectedGame.value?.id === game.id) {
+    return
+  }
   selectedGame.value = game
   aiChatStore.setSelectedGameId(game.id)
   aiChatStore.addMessage({
@@ -848,6 +861,7 @@ async function doAnalyze(description) {
   isAnalyzing.value = true
   analyzingSeconds.value = 0
   const startTime = Date.now()
+  clearInterval(requestTimer)
   requestTimer = setInterval(() => {
     analyzingSeconds.value++
   }, 1000)
@@ -913,9 +927,11 @@ async function doAnalyze(description) {
 }
 
 function startMetricsUpdate() {
-  const interval = setInterval(() => {
+  clearInterval(metricsInterval)
+  metricsInterval = setInterval(() => {
     if (!isCapturing.value) {
-      clearInterval(interval)
+      clearInterval(metricsInterval)
+      metricsInterval = null
       return
     }
     latency.value = Math.floor(80 + Math.random() * 100)
@@ -1139,6 +1155,10 @@ function stopVoiceConversation() {
   recognitionPausedForSpeech = false
   clearTimeout(voiceSubmitTimer)
   clearTimeout(recognitionRestartTimer)
+  clearInterval(requestTimer)
+  clearInterval(metricsInterval)
+  requestTimer = null
+  metricsInterval = null
   voiceSubmitTimer = null
   recognitionRestartTimer = null
 
@@ -1307,6 +1327,7 @@ async function sendMessage(text, options = {}) {
   isAnalyzing.value = true
   analyzingSeconds.value = 0
   const startTime = Date.now()
+  clearInterval(requestTimer)
   requestTimer = setInterval(() => {
     analyzingSeconds.value++
   }, 1000)
@@ -1366,6 +1387,8 @@ async function sendMessage(text, options = {}) {
         if (settings.personality && settings.personality !== 'friendly') {
           aiChatStore.recordPersonalityUsage(elapsed)
         }
+      } else {
+        throw new Error(res.message || 'AI未返回有效回复')
       }
     }
   } catch (err) {
@@ -1865,8 +1888,6 @@ function handleDeleteGame(game) {
 }
 
 onMounted(async () => {
-  localStorage.removeItem('ai-chat-state')
-  
   if (!gameStore.initialized) {
     await gameStore.fetchGames()
   }
@@ -1894,6 +1915,10 @@ onUnmounted(() => {
   isVoiceConversationActive.value = false
   clearTimeout(voiceSubmitTimer)
   clearTimeout(recognitionRestartTimer)
+  clearInterval(requestTimer)
+  clearInterval(metricsInterval)
+  requestTimer = null
+  metricsInterval = null
   if (streamAbortController.value) {
     streamAbortController.value.abort()
     streamAbortController.value = null
