@@ -4,8 +4,8 @@ target
 .git
 uploads
 logs
+src/test
 *.log
 application-local.yml
 application-local.properties
 .env*
-
