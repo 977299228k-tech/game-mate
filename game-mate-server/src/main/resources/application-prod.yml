@@ -12,6 +12,11 @@ mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
+logging:
+  level:
+    com.gamemate: INFO
+    org.springframework.security: WARN
+
 game-mate:
   cors:
     allowed-origins: ${GAME_MATE_ALLOWED_ORIGINS:gamemate://app}
