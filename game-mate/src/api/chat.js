@@ -27,6 +27,11 @@ export async function streamMessageWithPersonality(data, { onDelta, signal } = {
 
   if (!response.ok) {
     const message = await response.text()
+    if (response.status === 401) {
+      localStorage.removeItem('token')
+      window.location.hash = '#/login'
+      throw new Error('登录已过期，请重新登录')
+    }
     throw new Error(message || `流式请求失败（${response.status}）`)
   }
   if (!response.body) {
