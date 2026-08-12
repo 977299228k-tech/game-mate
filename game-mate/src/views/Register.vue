@@ -25,6 +25,14 @@
               :prefix-icon="Message"
             />
           </el-form-item>
+          <el-form-item label="手机号">
+            <el-input
+              v-model="form.phone"
+              placeholder="输入手机号"
+              size="large"
+              :prefix-icon="Phone"
+            />
+          </el-form-item>
           <el-form-item label="密码">
             <el-input
               v-model="form.password"
@@ -79,7 +87,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Message } from '@element-plus/icons-vue'
+import { User, Lock, Message, Phone } from '@element-plus/icons-vue'
 import { useUserStore } from '../stores/userStore'
 
 const router = useRouter()
@@ -89,14 +97,20 @@ const loading = ref(false)
 
 const form = reactive({
   nickname: '',
+  phone: '',
   email: '',
   password: '',
   confirmPassword: ''
 })
 
 async function handleRegister() {
-  if (!form.nickname || !form.email || !form.password) {
+  if (!form.nickname || !form.phone || !form.email || !form.password || !form.confirmPassword) {
     ElMessage.warning('请填写完整信息')
+    return
+  }
+
+  if (!/^1[3-9]\d{9}$/.test(form.phone)) {
+    ElMessage.warning('请输入正确的手机号')
     return
   }
   
@@ -107,7 +121,13 @@ async function handleRegister() {
   
   loading.value = true
   try {
-    const result = await userStore.register(form.nickname, form.email, form.password)
+    const result = await userStore.register(
+      form.nickname,
+      form.phone,
+      form.email,
+      form.password,
+      form.confirmPassword
+    )
     if (result.success) {
       ElMessage.success('注册成功，赠送2小时体验时长！')
       router.push('/ai-chat')
