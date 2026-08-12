@@ -16,6 +16,8 @@ public interface ChatService {
 
     List<ChatMessageVO> getRecentMessages(Long userId);
 
+    List<ChatMessageVO> getRecentMessages(Long userId, Long gameId, int limit);
+
     ChatMessageVO analyzeScreen(Long userId, ChatMessageDTO dto, MultipartFile image);
 
     ChatMessageVO analyzeScreenWithQuery(Long userId, ChatMessageDTO dto, MultipartFile image);
