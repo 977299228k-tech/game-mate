@@ -172,8 +172,15 @@ const gameCount = computed(() => {
 })
 
 const todayCount = computed(() => {
-  const today = new Date().toLocaleDateString('zh-CN')
-  return highlights.value.filter(h => h.time?.includes(today)).length
+  const today = new Date()
+  return highlights.value.filter(h => {
+    const value = h.createTime || h.time
+    const date = value ? new Date(value) : null
+    return date && !Number.isNaN(date.getTime())
+      && date.getFullYear() === today.getFullYear()
+      && date.getMonth() === today.getMonth()
+      && date.getDate() === today.getDate()
+  }).length
 })
 
 function viewHighlight(item) {
